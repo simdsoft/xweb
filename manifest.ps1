@@ -6,15 +6,17 @@ $nginx_ver = '1.27.3'
 
 # mysql
 #  https://dev.mysql.com/downloads/mysql/
+#  https://cdn.mysql.com//Downloads/MySQL-9.1/mysql-9.1.0-winx64.zip
 #  https://downloads.mysql.com/archives/get/p/23/file/mysql-8.4.2-winx64.zip
-$mysql_ver = '8.4.2'
+$mysql_latest = [Version]'9.1.0'
+$mysql_ver = [Version]'9.1.0'
 # $mariadb_ver = '11.6.2'
 
 # php
 #  https://windows.php.net/download/
 #  https://windows.php.net/downloads/releases/php-8.4.2-Win32-vs17-x64.zip
 #  https://windows.php.net/downloads/releases/archives/php-7.4.33-Win32-vc15-x64.zip
-$php_latset_ver = '8.4.2'
+$php_latset = '8.4.2'
 $php_ver = '7.4.33' # '8.4.2'
 
 # php xdebug ext

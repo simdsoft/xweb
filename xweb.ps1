@@ -13,7 +13,7 @@ param(
     [switch]$version
 )
 
-$xweb_ver = '1.0.1'
+$xweb_ver = '1.0.2'
 
 Set-Alias println Write-Host
 
@@ -27,6 +27,18 @@ $Global:IsWin = $IsWindows -or ("$env:OS" -eq 'Windows_NT')
 $download_path = Join-Path $PSScriptRoot 'cache'
 $install_prefix = $PSScriptRoot
 
+function parse_prop($line_text) {
+    if ($line_text -match "^#.*$") {
+        return $null
+    }
+    if ($line_text -match "^(.+?)\s*=\s*(.*)$") {
+        $key = $matches[1].Trim()
+        $value = $matches[2].Trim()
+        return $key, $value
+    }
+    return $null
+}
+
 function ConvertFrom-Props {
     param(
         [Parameter(Mandatory=$true)]
@@ -36,12 +48,8 @@ function ConvertFrom-Props {
     $props = @{}
 
     foreach($_ in $InputObject) {
-        if ($_ -match "^#.*$") {
-            continue
-        }
-        if ($_ -match "^(.+?)\s*=\s*(.*)$") {
-            $key = $matches[1].Trim()
-            $value = $matches[2].Trim()
+        $key,$val = parse_prop $_
+        if ($key) {
             $props[$key] = $value
         }
     }
@@ -195,7 +203,7 @@ $actions = @{
             fetch_pkg "https://nginx.org/download/nginx-${nginx_ver}.zip"  -exrep "nginx-${nginx_ver}=${nginx_ver}" -prefix 'bin/nginx'
         }
         php = {
-            if ($php_ver -eq $php_latset_ver) {
+            if ($php_ver -eq $php_latset) {
                 fetch_pkg "https://windows.php.net/downloads/releases/php-${php_ver}-Win32-$php_vs-x64.zip" -exrep "bin/php/${php_ver}"
             } else {
                 fetch_pkg "https://windows.php.net/downloads/releases/archives/php-${php_ver}-Win32-$php_vs-x64.zip" -exrep "bin/php/${php_ver}"
@@ -205,7 +213,12 @@ $actions = @{
             fetch_pkg "https://files.phpmyadmin.net/phpMyAdmin/${phpmyadmin_ver}/phpMyAdmin-${phpmyadmin_ver}-all-languages.zip" -exrep "phpMyAdmin-${phpmyadmin_ver}-all-languages=${phpmyadmin_ver}" -prefix 'apps/phpmyadmin'
         }
         mysql = {
-            fetch_pkg "https://downloads.mysql.com/archives/get/p/23/file/mysql-${mysql_ver}-winx64.zip" -exrep "mysql-${mysql_ver}-winx64=${mysql_ver}" -prefix 'bin/mysql'
+            if ($mysql_ver -eq $mysql_latest) {
+                fetch_pkg "https://cdn.mysql.com//Downloads/MySQL-$($mysql_ver.Major).$($mysql_ver.Minor)/mysql-$mysql_ver-winx64.zip" -exrep "mysql-${mysql_ver}-winx64=${mysql_ver}" -prefix 'bin/mysql'
+            }
+            else {
+                fetch_pkg "https://downloads.mysql.com/archives/get/p/23/file/mysql-${mysql_ver}-winx64.zip" -exrep "mysql-${mysql_ver}-winx64=${mysql_ver}" -prefix 'bin/mysql'
+            }
         }
         mariadb = {
             fetch_pkg "https://mirrors.tuna.tsinghua.edu.cn/mariadb///mariadb-$mariadb_ver/winx64-packages/mariadb-$mariadb_ver-winx64.zip" -exrep "mariadb-$mariadb_ver-winx64=$mariadb_ver" -prefix 'bin/mariadb'
@@ -261,8 +274,7 @@ $actions = @{
                     return $false
                 }
 
-                # TODO:
-                $upload_props = @{upload_max_filesize='64MB'; post_max_size='64MB'; memory_limit='128MB'}
+                $upload_props = @{upload_max_filesize='64M'; post_max_size='64M'; memory_limit='128M'}
 
                 $exclude_exts = @('*=oci8_12c*', '*=pdo_firebird*', '*=pdo_oci*', '*=snmp*')
 
@@ -283,6 +295,13 @@ $actions = @{
                         $match_info = [Regex]::Match($line_text, '(?<!;)\bextension=([^;]+)')
                         if($match_info.Success -and $line_text.StartsWith('extension=')) {
                             println "php.ini: $($match_info.value)"
+                        }
+                    }
+                    else {
+                        $key,$val = parse_prop $line_text
+                        if ($key -and $upload_props.Contains($key)) {
+                            $new_val = $upload_props[$key]
+                            $lines[$line_index] = "$key = $new_val"
                         }
                     }
                     ++$line_index
@@ -429,7 +448,7 @@ switch($op){
     }
 }
 
-if($? -and !$LASTEXITCODE) {
+if($?) {
     println "The operation successfully."
 }
 else {
