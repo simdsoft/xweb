@@ -20,7 +20,7 @@ $php_ver = '7.4.33' # '8.4.2'
 # php xdebug ext
 #  https://xdebug.org/files/php_xdebug-3.1.6-7.4-vc15-x86_64.dll
 #  https://xdebug.org/files/php_xdebug-3.4.0-8.4-vs17-x86_64.dll
-$xdebug_Ver = '3.1.6'
+$xdebug_ver_map = @{'7.4' = '3.1.6' ; '8.4' = '3.4.0'}
 
 # phpmyadmin
 #  https://files.phpmyadmin.net

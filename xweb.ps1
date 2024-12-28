@@ -13,7 +13,7 @@ param(
     [switch]$version
 )
 
-$xweb_ver = '1.0.0'
+$xweb_ver = '1.0.1'
 
 Set-Alias println Write-Host
 
@@ -300,6 +300,7 @@ $actions = @{
         
             # xdebug
             $xdebug_php_ver = "$($php_ver.Major).$($php_ver.Minor)"
+            $xdebug_ver = $xdebug_ver_map[$xdebug_php_ver]
             $xdebug_file_name = "php_xdebug-$xdebug_ver-$xdebug_php_ver-$php_vs-x86_64.dll"
             download_file -url "https://xdebug.org/files/$xdebug_file_name" -out $(Join-Path $download_path $xdebug_file_name)
             $xdebug_src = Join-Path $download_path $xdebug_file_name
