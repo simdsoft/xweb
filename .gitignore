@@ -1,0 +1,15 @@
+.vscode
+
+local.properties
+data
+temp
+cache
+logs
+bin
+apps
+etc/nginx/**/nginx.conf
+etc/certs/*.key
+etc/certs/*.pem
+etc/certs/*.crt
+etc/data
+htdocs
