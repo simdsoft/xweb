@@ -5,6 +5,9 @@
 #   - https://certificatetools.com/
 # cert settings
 
+script_dir=$(cd "$(dirname "$0")" && pwd)
+cd $script_dir
+
 function years_to_days {
   years=$1
   time_ts=`date +%s`
@@ -17,20 +20,29 @@ function years_to_days {
   echo $days
 }
 
+# v1 only support single domain name ssl cert
 is_v1=$1
+force=$2
 key_bits=2048
-common_name="*.simdsoft.com"
+# firefox requre domain name
+domain_name="xweb.dev"
 hash_alg=-sha384
 issued_org='Simdsoft Limited'
 
 # issuer information
-issuer_valid_years=1000
+issuer_valid_years=100
 issuer_org='Simdsoft Limited'
 issuer_name="Simdsoft RSA CA $issuer_valid_years"
 issuer_subj="/C=CN/O=$issuer_org/CN=$issuer_name"
 
 
-valid_years=1000
+valid_years=$issuer_valid_years
+
+if [ "$force" = 'true' ] ; then
+  echo 'force regen certs ...'
+  rm ./ca-**
+  rm ./server.*
+fi
 
 # Create Self-Signed Root CA(Certificate Authority)
 issuer_valid_days=`years_to_days $issuer_valid_years`
@@ -48,7 +60,7 @@ fi
 
 # 1. Generate unencrypted 2048-bits RSA private key for the server (CA) & Generate CSR for the server
 valid_days=`years_to_days $valid_years`
-openssl req -newkey rsa:$key_bits $hash_alg -nodes -keyout server.key -out server-csr.pem -subj "/C=CN/O=$issued_org/CN=$common_name"
+openssl req -newkey rsa:$key_bits $hash_alg -nodes -keyout server.key -out server-csr.pem -subj "/C=CN/O=$issued_org/CN=$domain_name"
 
 # 2. Sign with our RootCA
 if [ "$is_v1" != 'true' ] ; then
@@ -63,3 +75,5 @@ rm -rf ./server-csr.pem
 
 # Check if the certificate is signed properly
 openssl x509 -in server.crt -noout -text
+
+cd -

@@ -7,6 +7,13 @@
 - *`action_name`*: `fetch`, `init`, `install`, `start`, `stop`, `restart`
 - *`targets`*: optional, possible values: `all`, `nginx`, `php`, `phpmyadmin`, `mysql`
 
+## Support platforms
+
+- Windows: ready
+- Ubuntu Linux: testing
+   - nginx, mysql runas current user
+   - php runas root
+
 examples:  
 
 - `xweb.ps1 install`
@@ -18,19 +25,19 @@ examples:
 
 Note: if xweb was moved to other location, please rerun `xweb.ps1 init nginx -f`
 
-## µ¼ÈëÊı¾İ¿âÊ§°Ü½â¾ö·½°¸
+## å¯¼å…¥æ•°æ®åº“å¤±è´¥è§£å†³æ–¹æ¡ˆ
 
-1. °¢ÀïÔÆĞÂ°æ±¾ DMS µ¼³öµÄÊı¾İ¿â£¬Ã»ÓĞ create table Óï¾ä£¬²»ÄÜÒ»¼üµ¼Èë?  
+1. é˜¿é‡Œäº‘æ–°ç‰ˆæœ¬ DMS å¯¼å‡ºçš„æ•°æ®åº“ï¼Œæ²¡æœ‰ create table è¯­å¥ï¼Œä¸èƒ½ä¸€é”®å¯¼å…¥?  
 
-   ½â¾ö·½°¸: µ¼³öÊ±Ñ¡Ôñµ¼³ö¡°Êı¾İºÍ½á¹¹¡±£¬ ¹´Ñ¡Ñ¹Ëõ insert Óï¾ä
+   è§£å†³æ–¹æ¡ˆ: å¯¼å‡ºæ—¶é€‰æ‹©å¯¼å‡ºâ€œæ•°æ®å’Œç»“æ„â€ï¼Œ å‹¾é€‰å‹ç¼© insert è¯­å¥
 
 
-2. ÍøÒ³µ¼³ö  
+2. ç½‘é¡µå¯¼å‡º  
 
-   É¾³ıÊ×Î²: `FOREIGN_KEY_CHECKS` Ïà¹ØÓï¾ä
-   È¥³ı UTF-8 BOM
+   åˆ é™¤é¦–å°¾: `FOREIGN_KEY_CHECKS` ç›¸å…³è¯­å¥
+   å»é™¤ UTF-8 BOM
 
-## ÖØÖÃ mysql ÃÜÂë:
+## é‡ç½® mysql å¯†ç :
 
 - Linux
     vim /etc/my.cnf
@@ -42,10 +49,10 @@ Note: if xweb was moved to other location, please rerun `xweb.ps1 init nginx -f`
     ```sh
     systemctl stop mysqld.service
     systemctl start mysqld.service
-    mysql ¨Cu root
+    mysql â€“u root
     ```
 
 - Windows
 
-1. Ö´ĞĞ£º`mysqld --skip-grant-tables`£¨´°¿Ú»áÒ»Ö±Í£Ö¹£©¡¡
-2. È»ºóÁíÍâ´ò¿ªÒ»¸öÃüÈëÁîĞĞ´°¿Ú£¬Ö´ĞĞ mysql£¨»òÕßÖ±½Ó½øÈëMysql Command Line Cilent£©£¬´ËÊ±ÎŞĞèÊäÈëÃÜÂë¼´¿É½øÈë¡£
+1. æ‰§è¡Œï¼š`mysqld --skip-grant-tables`ï¼ˆçª—å£ä¼šä¸€ç›´åœæ­¢ï¼‰ã€€
+2. ç„¶åå¦å¤–æ‰“å¼€ä¸€ä¸ªå‘½å…¥ä»¤è¡Œçª—å£ï¼Œæ‰§è¡Œ mysqlï¼ˆæˆ–è€…ç›´æ¥è¿›å…¥Mysql Command Line Cilentï¼‰ï¼Œæ­¤æ—¶æ— éœ€è¾“å…¥å¯†ç å³å¯è¿›å…¥ã€‚
