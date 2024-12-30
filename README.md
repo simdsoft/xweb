@@ -1,5 +1,7 @@
 ## xweb - A nginx + mysql + php environment
 
+[![Latest Release](https://img.shields.io/github/v/release/simdsoft/xweb?label=release)](https://github.com/simdsoft/xweb/releases)
+
 ## Quick Start
 
 ### install and start service
