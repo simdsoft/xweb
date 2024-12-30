@@ -6,13 +6,14 @@
 1. Install [powershell 7](https://github.com/PowerShell/PowerShell) and open pwsh terminal
 2. Clone https://github.com/simdsoft/xweb.git and goto to root directory of xweb
 3. `./xweb install`
-4. `./xweb start`
+4. `./etc/certs/gen.sh`, on windows, please enter wsl to execute script `gen.sh`
+5. `./xweb start`
 
 ### visit local web
 
 1. Add domain `sandbox.xweb.dev` to your system hosts
-
-2. visit web on your browser
+2. Install `./etc/certs/ca-cer.crt` to `Trusted Root Certificate Authorities` of current user
+3. visit web on your browser
   - https://sandbox.xweb.dev/phpinfo.php to check does php works
   - https://sandbox.xweb.dev/phpmyadmin to manage database
 
