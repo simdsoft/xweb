@@ -1,15 +1,13 @@
 .vscode
 
 local.properties
-data
-temp
+
 cache
-logs
-bin
-apps
+var
+opt
+
 etc/nginx/**/nginx.conf
-etc/certs/*.key
-etc/certs/*.pem
-etc/certs/*.crt
-etc/data
+etc/certs/ca-*
+etc/certs/server*
+
 htdocs

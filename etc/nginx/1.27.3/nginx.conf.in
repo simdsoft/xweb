@@ -127,13 +127,15 @@ http {
        }
 
        location /phpmyadmin {
-         rewrite ^/phpmyadmin$ /phpmyadmin/ permanent; 
-         alias $xweb_root/apps/phpmyadmin/5.2.1/;
+         rewrite ^/phpmyadmin$ /phpmyadmin/ permanent;
+         alias $xweb_root/opt/phpmyadmin/5.2.1/;
          location ~ ^/phpmyadmin/(.+\.php)$ {
+           try_files $uri =404;
            fastcgi_pass   127.0.0.1:9000;
            fastcgi_index  index.php;
            include fastcgi_params;
            # $document_root$fastcgi_script_name not work
+           # $request_filename also works, not not perform rewrite /phpmyadmin/
            fastcgi_param  SCRIPT_FILENAME $document_root$1;
          }
          index  index.php index.html index.htm;

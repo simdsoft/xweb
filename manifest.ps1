@@ -16,8 +16,8 @@ $mysql_ver = [Version]'9.1.0'
 #  https://windows.php.net/download/
 #  https://windows.php.net/downloads/releases/php-8.4.2-Win32-vs17-x64.zip
 #  https://windows.php.net/downloads/releases/archives/php-7.4.33-Win32-vc15-x64.zip
-$php_latset = '8.4.2'
-$php_ver = '7.4.33' # '8.4.2'
+$php_latset = [Version]'8.4.2'
+$php_ver = [Version]'7.4.33' # '8.4.2'
 
 # php xdebug ext
 #  https://xdebug.org/files/php_xdebug-3.1.6-7.4-vc15-x86_64.dll

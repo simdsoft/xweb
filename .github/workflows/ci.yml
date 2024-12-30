@@ -7,7 +7,7 @@ on:
     branches: [ "master" ]
 
 jobs:
-  CI:
+  windows:
     runs-on: windows-latest
     steps:
     - uses: actions/checkout@v4
@@ -15,4 +15,11 @@ jobs:
       shell: pwsh
       run: |
         .\xweb.ps1 install
-        .\xweb.ps1 stop mysql
+  ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: CI
+      shell: pwsh
+      run: |
+        ./xweb.ps1 install

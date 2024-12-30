@@ -2,9 +2,6 @@
 # Copyright (c) 2024-present Simdsoft Limited.
 #
 # xweb - A nginx + mysql + php environment
-#  Notes:
-#   - now only support windows
-#   - TODO: Linux support
 #
 param(
     $op = 'start',
@@ -27,7 +24,7 @@ $Global:IsUbuntu = !$IsWin -and ($PSVersionTable.OS -like 'Ubuntu *')
 . (Join-Path $PSScriptRoot 'manifest.ps1')
 
 $download_path = Join-Path $PSScriptRoot 'cache'
-$install_prefix = $PSScriptRoot
+$install_prefix = Join-Path $PSScriptRoot 'opt'
 
 function parse_prop($line_text) {
     if ($line_text -match "^#.*$") {
@@ -65,7 +62,7 @@ function gen_random_key {
         [int]$Length
     )
 
-    $charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;:,.<>/?'
+    $charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@$%^&*~'
     $random = [System.Security.Cryptography.RandomNumberGenerator]::Create()
     $key = [System.Text.StringBuilder]::new($Length)
 
@@ -80,7 +77,7 @@ function gen_random_key {
 }
 
 function mkdirs($path) {
-    if (!(Test-Path $path)) { New-Item $path -ItemType Directory }
+    if (!(Test-Path $path)) { New-Item $path -ItemType Directory 1>$null }
 }
 
 function download_file($url, $out) {
@@ -123,7 +120,7 @@ function resolve_path ($path, $prefix = $null) {
     if ([IO.Path]::IsPathRooted($path)) { 
         return $path 
     } else {
-        if(!$prefix) { $prefix = $install_prefix }
+        if(!$prefix) { $prefix = $PSScriptRoot }
         return Join-Path $prefix $path
     }
 }
@@ -180,29 +177,38 @@ $actions = @{
 
         if ($targets -eq 'all') {
             $targets = @('nginx', 'php', 'mysql')
-            if ($op -eq 'init' -or $op -eq 'fetch') { $targets += 'phpmyadmin' }
+            $setup_actions = @('init'; 'fetch'; 'install')
+            if ($setup_actions.Contains($op)) { $targets += 'phpmyadmin' }
         } elseif($targets -isnot [array]) {
             $targets = "$targets".Split(',')
         }
 
         $Script:targets = $targets
 
+        mkdirs $install_prefix
         mkdirs $download_path
-        mkdirs $(Join-Path $PSScriptRoot 'temp')
+        mkdirs $(Join-Path $PSScriptRoot 'var/nginx/logs')
+        mkdirs $(Join-Path $PSScriptRoot 'var/nginx/temp')
+        mkdirs $(Join-Path $PSScriptRoot 'var/php-cgi')
+        mkdirs $(Join-Path $PSScriptRoot 'var/mysqld')
         $prop_file = (Join-Path $PSScriptRoot 'local.properties')
         if (Test-Path $prop_file -PathType Leaf) {
             $props_lines = (Get-Content -Path $prop_file)
         }
         else {
             $mysql_pass = gen_random_key -Length 16
-            $props_lines = @("mysql_pass=$mysql_pass", "mysql_auth_backport=0", "server_names=sandbox.xweb.com")
+            $props_lines = @("mysql_pass=$mysql_pass", "mysql_auth_backport=0", "server_names=sandbox.xweb.dev")
             Set-Content -Path $prop_file -Value $props_lines
         }
         $Script:local_props = ConvertFrom-Props $props_lines
 
-        $Script:php_ver = [version]$php_ver
-        $is_php8 = $php_ver -ge [Version]'8.0.0'
-        $Script:php_vs = @('vc15', 'vs17')[$is_php8]
+        if($IsWin) {
+            $is_php8 = $php_ver -ge [Version]'8.0.0'
+            $Script:php_vs = @('vc15', 'vs17')[$is_php8]
+
+            $Script:mysqld_cwd = Join-Path $PSScriptRoot 'var/mysqld'
+            $Script:mysqld_data = Join-Path $PSScriptRoot 'var/mysqld/data'
+        }
     }
 }
 
@@ -264,33 +270,34 @@ function mod_php_ini($php_ini_file, $do_setup) {
 if ($IsWin) {
     $actions.fetch = @{
         nginx = {
-            fetch_pkg "https://nginx.org/download/nginx-${nginx_ver}.zip"  -exrep "nginx-${nginx_ver}=${nginx_ver}" -prefix 'bin/nginx'
+            fetch_pkg "https://nginx.org/download/nginx-${nginx_ver}.zip" -exrep "nginx-${nginx_ver}=${nginx_ver}" -prefix 'opt/nginx'
         }
         php = {
-            if ("$php_ver" -eq $php_latset) {
-                fetch_pkg "https://windows.php.net/downloads/releases/php-${php_ver}-Win32-$php_vs-x64.zip" -exrep "bin/php/${php_ver}"
+            if ($php_ver -eq $php_latset) {
+                fetch_pkg "https://windows.php.net/downloads/releases/php-${php_ver}-Win32-$php_vs-x64.zip" -exrep "opt/php/${php_ver}"
             } else {
-                fetch_pkg "https://windows.php.net/downloads/releases/archives/php-${php_ver}-Win32-$php_vs-x64.zip" -exrep "bin/php/${php_ver}"
+                fetch_pkg "https://windows.php.net/downloads/releases/archives/php-${php_ver}-Win32-$php_vs-x64.zip" -exrep "opt/php/${php_ver}"
             }
         }
         phpmyadmin = {
-            fetch_pkg "https://files.phpmyadmin.net/phpMyAdmin/${phpmyadmin_ver}/phpMyAdmin-${phpmyadmin_ver}-all-languages.zip" -exrep "phpMyAdmin-${phpmyadmin_ver}-all-languages=${phpmyadmin_ver}" -prefix 'apps/phpmyadmin'
+            fetch_pkg "https://files.phpmyadmin.net/phpMyAdmin/${phpmyadmin_ver}/phpMyAdmin-${phpmyadmin_ver}-all-languages.zip" -exrep "phpMyAdmin-${phpmyadmin_ver}-all-languages=${phpmyadmin_ver}" -prefix 'opt/phpmyadmin'
+            fetch_pkg "https://files.phpmyadmin.net/themes/boodark-nord/1.1.0/boodark-nord-1.1.0.zip" -prefix "opt/phpmyadmin/${phpmyadmin_ver}/themes/"
         }
         mysql = {
             if ($mysql_ver -eq $mysql_latest) {
-                fetch_pkg "https://cdn.mysql.com//Downloads/MySQL-$($mysql_ver.Major).$($mysql_ver.Minor)/mysql-$mysql_ver-winx64.zip" -exrep "mysql-${mysql_ver}-winx64=${mysql_ver}" -prefix 'bin/mysql'
+                fetch_pkg "https://cdn.mysql.com//Downloads/MySQL-$($mysql_ver.Major).$($mysql_ver.Minor)/mysql-$mysql_ver-winx64.zip" -exrep "mysql-${mysql_ver}-winx64=${mysql_ver}" -prefix 'opt/mysql'
             }
             else {
-                fetch_pkg "https://downloads.mysql.com/archives/get/p/23/file/mysql-${mysql_ver}-winx64.zip" -exrep "mysql-${mysql_ver}-winx64=${mysql_ver}" -prefix 'bin/mysql'
+                fetch_pkg "https://downloads.mysql.com/archives/get/p/23/file/mysql-${mysql_ver}-winx64.zip" -exrep "mysql-${mysql_ver}-winx64=${mysql_ver}" -prefix 'opt/mysql'
             }
         }
         mariadb = {
-            fetch_pkg "https://mirrors.tuna.tsinghua.edu.cn/mariadb///mariadb-$mariadb_ver/winx64-packages/mariadb-$mariadb_ver-winx64.zip" -exrep "mariadb-$mariadb_ver-winx64=$mariadb_ver" -prefix 'bin/mariadb'
+            fetch_pkg "https://mirrors.tuna.tsinghua.edu.cn/mariadb///mariadb-$mariadb_ver/winx64-packages/mariadb-$mariadb_ver-winx64.zip" -exrep "mariadb-$mariadb_ver-winx64=$mariadb_ver" -prefix 'opt/mariadb'
         }
     }
     $actions.init = @{
         php = {
-            $php_dir = Join-Path $PSScriptRoot "bin/php/$php_ver"
+            $php_dir = Join-Path $install_prefix "php/$php_ver"
             $php_ini = (Join-Path $php_dir 'php.ini')
         
             if (!(Test-Path $php_ini -PathType Leaf) -or $force) {
@@ -316,95 +323,161 @@ if ($IsWin) {
             Copy-Item $xdebug_src $xdebug_dest -Force
         }
         phpmyadmin = {
-            $phpmyadmin_dir = Join-Path $PSScriptRoot "apps/phpmyadmin/$phpmyadmin_ver"
+            $phpmyadmin_dir = Join-Path $install_prefix "phpmyadmin/$phpmyadmin_ver"
             $phpmyadmin_conf = (Join-Path $phpmyadmin_dir 'config.inc.php')
         
             if (!(Test-Path $phpmyadmin_conf -PathType Leaf) -or $force) {
                 $blowfish_secret = gen_random_key -Length 32
                 $lines = Get-Content -Path (Join-Path $phpmyadmin_dir 'config.sample.inc.php')
                 $line_index = 0
+                $has_theme_manager = $false
+                $has_theme_default = $false
                 foreach($line_text in $lines) {
                     if ($line_text -like "*blowfish_secret*") {
-                        $lines[$line_index] = $line_text -replace "''", "'$blowfish_secret'"
+                        $lines[$line_index] = $line_text.Replace("''", "'$blowfish_secret'")
+                    }
+                    elseif($line_text -like '*ThemeManager*') {
+                        $lines[$line_index] = $line_text.Replace("false", "true")
+                        $has_theme_manager = $true
+                    }
+                    elseif($line_text -like '*ThemeDefault*') {
+                        $lines[$line_index] = $line_text -replace "'.*'", "'boodark-nord'"
+                        $has_theme_default = $true
                     }
                     ++$line_index
+                }
+                if(!$has_theme_manager) {
+                    $lines += "`$cfg['ThemeManager'] = true;"
+                    $lines += "`$cfg['ShowAll'] = true;"
+                }
+                if(!$has_theme_default) {
+                    $lines += "`$cfg['ThemeDefault'] = 'boodark-nord';"
                 }
                 Set-Content -Path $phpmyadmin_conf -Value $lines
             }
         }
         mysql = {
             # enable plugin mysql_native_password, may don't required
-            $mysql_dir = Join-Path $PSScriptRoot "bin/mysql/$mysql_ver"
-            $mysql_data = Join-Path $mysql_dir 'data'
-            if (Test-Path $mysql_data -PathType Container) {
-                println "mysql already inited."
-                return
+            $mysql_dir = Join-Path $install_prefix "mysql/$mysql_ver"
+            if (Test-Path $mysqld_data -PathType Container) {
+                $anwser = if ($force) {  Read-Host "Are you sure force reinit mysqld, will lost all database(y/N)?" } else { 'N' }
+                if ($anwser -inotlike 'y*') {
+                    println "mysql init: nothing need to do"
+                    return
+                }
+                
+                println "Deleting $mysqld_data"
+                taskkill /f /im mysqld.exe 2>$null
+                Remove-Item $mysqld_data -Recurse -Force
             }
 
             $mysql_bin = Join-Path $mysql_dir 'bin'
-
-            Push-Location $mysql_bin
-            & .\mysqld --initialize-insecure
-
+            $mysqld_prog = Join-Path $mysql_bin 'mysqld.exe'
+            $mysql_prog = Join-Path $mysql_bin 'mysql.exe'
+            
             $mysql_pass = $local_props['mysql_pass']
-            $mysql_auth_backport = [int]$local_props['mysql_auth_backport']
+            $mysql_auth_backport = [int]$local_props['mysql_auth_backport'] -and $mysql_ver.Major -lt 9
             if ($mysql_auth_backport) {
-                Copy-Item (Join-Path $PSScriptRoot "etc/mysql/my.ini") $mysql_dir -Force
-                $init_cmds = "use mysql; ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '$mysql_pass'; FLUSH PRIVILEGES;"
-            } else {
-                $init_cmds = "use mysql; UPDATE user SET authentication_string='' WHERE user='root'; ALTER user 'root'@'localhost' IDENTIFIED BY '$mysql_pass';"
+                $my_conf_file = Join-Path $PSScriptRoot 'etc/mysql/my.ini'
+                Copy-Item $my_conf_file $mysql_dir -Force
             }
 
-            Start-Process .\mysqld.exe -ArgumentList '--console'
+            Push-Location $mysqld_cwd
+            & $mysqld_prog --initialize-insecure --datadir $mysqld_data | Out-Host
+
+            Start-Process $mysqld_prog -ArgumentList "--console --datadir `"$mysqld_data`"" -WorkingDirectory $mysqld_cwd
             println "Wait mysqld ready ..."
             Start-Sleep -Seconds 3
-            & .\mysql -u root -e $init_cmds | Out-Host
+
+            if ($mysql_auth_backport) {
+                $set_pass_cmds = "use mysql; ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '$mysql_pass'; FLUSH PRIVILEGES;"
+            } else {
+                $set_pass_cmds = "use mysql; UPDATE user SET authentication_string='' WHERE user='root'; ALTER user 'root'@'localhost' IDENTIFIED BY '$mysql_pass';"
+            }
+            & $mysql_prog -u root -e $set_pass_cmds | Out-Host
+            if ($?) {
+                taskkill /f /im mysqld.exe 2>$null
+            }
             Pop-Location
+        }
+    }
+    $actions.passwd = @{
+        mysql = {
+            taskkill /f /im mysqld.exe 2>$null
+            $mysql_dir = Join-Path $install_prefix "mysql/$mysql_ver"
+            $mysql_bin = Join-Path $mysql_dir 'bin'
+            $mysqld_prog = Join-Path $mysql_bin 'mysqld.exe'
+            $mysql_prog = Join-Path $mysql_bin 'mysql.exe'
+
+            Start-Process $mysqld_prog -ArgumentList "--console --skip-grant-tables --shared-memory --datadir `"$mysqld_data`"" -WorkingDirectory $mysqld_cwd
+            println "Wait mysqld ready ..."
+            Start-Sleep -Seconds 3
+            $mysql_pass1 = Read-Host "Please input new password"
+            $mysql_pass2 = Read-Host "input again"
+            if ($mysql_pass1 -ne $mysql_pass2) {
+                throw "two input passwd mismatch!"
+                return
+            }
+
+            $set_pass_cmds = "use mysql; FLUSH PRIVILEGES; UPDATE user SET authentication_string='' WHERE user='root'; ALTER user 'root'@'localhost' IDENTIFIED BY '$mysql_pass1';"
+            & $mysql_prog -u root -e $set_pass_cmds | Out-Host
+            if ($?) {
+                taskkill /f /im mysqld.exe 2>$null
+            }
+
+            $Global:LASTEXITCODE = 0
         }
     }
     $actions.start = @{
         nginx = {
-            $nginx_dir = Join-Path $install_prefix "bin/nginx/$nginx_ver"
+            $nginx_dir = Join-Path $install_prefix "nginx/$nginx_ver"
             $nginx_prog = Join-Path $nginx_dir 'nginx.exe'
             $nginx_conf = Join-Path $PSScriptRoot "etc/nginx/$nginx_ver/nginx.conf"
+            $nginx_cwd = Join-Path $PSScriptRoot 'var/nginx'
+            Push-Location $nginx_cwd
             &$nginx_prog -t -c $nginx_conf | Out-Host
-            Start-Process $nginx_prog -ArgumentList "-c `"$nginx_conf`"" -WorkingDirectory $nginx_dir -WindowStyle Hidden
+            Pop-Location
+            Start-Process $nginx_prog -ArgumentList "-c `"$nginx_conf`"" -WorkingDirectory $nginx_cwd -WindowStyle Hidden
         }
         php = {
-            $php_dir = Join-Path $install_prefix "bin/php/$php_ver"
-            $php_prog = Join-Path $php_dir 'php-cgi.exe'
-            Start-Process $php_prog -ArgumentList "-b 127.0.0.1:9000" -WorkingDirectory $php_dir -WindowStyle Hidden
+            $php_dir = Join-Path $install_prefix "php/$php_ver"
+            $php_cgi_prog = Join-Path $php_dir 'php-cgi.exe'
+            $php_cgi_cwd = Join-Path $PSScriptRoot 'var/php-cgi'
+            Start-Process $php_cgi_prog -ArgumentList "-b 127.0.0.1:9000" -WorkingDirectory $php_cgi_cwd -WindowStyle Hidden
         }
         mysql = {
-            $mysql_dir = Join-Path $install_prefix "bin/mysql/$mysql_ver/bin"
-            $myslqd_prog = Join-Path $mysql_dir 'mysqld.exe'
-            Start-Process $myslqd_prog -WorkingDirectory $mysql_dir -WindowStyle Hidden
+            $mysql_dir = Join-Path $install_prefix "mysql/$mysql_ver"
+            $myslqd_prog = Join-Path $mysql_dir 'bin/mysqld.exe'
+            Start-Process $myslqd_prog -ArgumentList "--datadir `"$mysqld_data`"" -WorkingDirectory $mysqld_cwd -WindowStyle Hidden
         }
     }
     $actions.stop = @{
         nginx = {
             taskkill /f /im nginx.exe 2>$null
+            $Global:LASTEXITCODE = 0
         }
         php = {
             taskkill /f /im php-cgi.exe 2>$null
             taskkill /f /im intelliphp.ls.exe 2>$null
+            $Global:LASTEXITCODE = 0
         }
         mysql = {
             taskkill /f /im mysqld.exe 2>$null
+            $Global:LASTEXITCODE = 0
         }
     }
 } elseif($IsUbuntu) { # Ubuntu Linux
     # local dev, use current user to run mysql
     # please use `mysql` as mysqld runner user when publish your site
-    $Script:mysql_user = whoami
+    $Script:xweb_user = whoami
     $actions.fetch = @{
         nginx = {
-            $nginx_dir = "$install_prefix/bin/nginx/$nginx_ver"
+            $nginx_dir = "$install_prefix/nginx/$nginx_ver"
             if (!(Test-Path $nginx_dir -PathType Container)) {
                 fetch_pkg -url "https://nginx.org/download/nginx-${nginx_ver}.tar.gz" -prefix 'cache'
-                $nginx_src = Join-Path $install_prefix "cache/nginx-${nginx_ver}"
+                $nginx_src = Join-Path $download_path "nginx-${nginx_ver}"
                 Push-Location $nginx_src
-                sudo apt install --allow-unauthenticated --yes libpcre3 libpcre3-dev
+                sudo apt install --allow-unauthenticated --yes libpcre3 libpcre3-dev libssl-dev
                 ./configure --with-http_ssl_module --prefix=$nginx_dir
                 make ; make install
                 Pop-Location
@@ -424,9 +497,6 @@ if ($IsWin) {
         mysql = {
             # sudo apt install mysql-server
             # we use offical deb to install latest mysql version 9.1.0
-            # TODO: try https://repo.mysql.com//mysql-apt-config_0.8.33-1_all.deb , step
-            #  1. sudo dpkg -i mysql-apt-config_0.8.33-1_all.deb
-            #  2. sudo apt update
             $os_info = $PSVersionTable.OS.Split(' ')
             $os_name = $os_info[0].ToLower()
             $os_ver = $os_info[1].Split('.')
@@ -465,17 +535,14 @@ if ($IsWin) {
                 Set-Content -Path "$download_path/php.ini" -Value $lines
                 sudo cp -f "$download_path/php.ini" "$php_ini_dir/php.ini"
             } else {
-                println "init php: nothing need to do"
+                println "php init: nothing need to do"
             }
         }
         mysql = {
             if (Test-Path /var/lib/mysql* -PathType Container) {
-                if (!$force) {
-                    println "Skip init mysql due to /var/lib/mysql exists"
-                    return
-                }
-                $anwser = Read-Host "Are you sure force reinit mysqld, will lost all database(y/N)?"
+                $anwser = if($force) { Read-Host "Are you sure force reinit mysqld, will lost all database(y/N)?" } else { 'N' }
                 if ($anwser -inotlike 'y*') {
+                    println "mysql init: nothing need to do"
                     return
                 }
             }
@@ -484,16 +551,16 @@ if ($IsWin) {
             foreach($tmp_dir in $mysql_tmp_dirs) {
                 sudo rm -rf $tmp_dir
                 sudo mkdir -p $tmp_dir
-                sudo chown -R ${mysql_user}:$mysql_user $tmp_dir
+                sudo chown -R ${xweb_user}:$xweb_user $tmp_dir
             }
 
-            sudo chown -R ${mysql_user}:$mysql_user /etc/mysql
+            sudo chown -R ${xweb_user}:$xweb_user /etc/mysql
             sudo chmod -R 750 /var/run/mysql /var/lib/mysql* /var/log/mysql /etc/mysql
             ls -l /var/run | grep mysql
             ls -l /var/lib | grep mysql
             ls -l /var/log | grep mysql
 
-            sudo mysqld --initialize-insecure --user=$mysql_user | Out-Host
+            sudo mysqld --initialize-insecure --user=$xweb_user | Out-Host
             
             $mysql_auth_backport = [int]$local_props['mysql_auth_backport']
             $mysql_pass = $local_props['mysql_pass']
@@ -504,7 +571,7 @@ if ($IsWin) {
                 $init_cmds = "use mysql; UPDATE user SET authentication_string='' WHERE user='root'; ALTER user 'root'@'localhost' IDENTIFIED BY '$mysql_pass';"
             }
 
-            bash -c "sudo mysqld --user=$mysql_user >/dev/null 2>&1 &"
+            bash -c "sudo mysqld --user=$xweb_user >/dev/null 2>&1 &"
             println "Wait mysqld ready ..."
             Start-Sleep -Seconds 3
             mysql -u root -e $init_cmds | Out-Host
@@ -513,7 +580,7 @@ if ($IsWin) {
     }
     $actions.start = @{
         nginx = {
-            $nginx_dir = Join-Path $install_prefix "bin/nginx/$nginx_ver"
+            $nginx_dir = Join-Path $install_prefix "nginx/$nginx_ver"
             $nginx_conf = Join-Path $PSScriptRoot "etc/nginx/$nginx_ver/nginx.conf"
             Push-Location $nginx_dir
             bash -c "sudo ./sbin/nginx -t -c '$nginx_conf'" | Out-Host
@@ -524,7 +591,7 @@ if ($IsWin) {
             bash -c "nohup sudo php-cgi -b 127.0.0.1:9000 >/dev/null 2>&1 &"
         }
         mysql = {
-            bash -c "nohup sudo mysqld --user=$mysql_user >/dev/null 2>&1 &"
+            bash -c "nohup sudo mysqld --user=$xweb_user >/dev/null 2>&1 &"
         }
     }
     $actions.stop = @{
@@ -552,22 +619,14 @@ $actions.init.nginx = {
     $nginx_conf_dir = Join-Path $PSScriptRoot "etc/nginx/$nginx_ver"
     $nginx_conf_file = Join-Path $nginx_conf_dir 'nginx.conf'
     if (Test-Path $nginx_conf_file -PathType Leaf) {
-        if ($force) {
-            $anwser = Read-Host "Are you want force init nginx, will lost conf?(y/N)"
-            if ($anwser -inotlike 'y*') {
-                return
-            }
-        }
-        else {
+        $anwser = if($force) { Read-Host "Are you want force reinit nginx, will lost conf?(y/N)" } else { 'N' }
+        if ($anwser -inotlike 'y*') {
+            println "nginx init: nothing need to do"
             return
         }
     }
 
-    if (!(Test-Path $nginx_conf_dir -PathType Container)) { 
-        mkdirs $nginx_conf_dir
-        Copy-Item (Join-Path $PSScriptRoot "bin/nginx/$nginx_ver/conf/*") $nginx_conf_dir
-    }
-    else {
+    if ((Test-Path $nginx_conf_dir -PathType Container)) {
         $lines = Get-Content -Path (Join-Path $nginx_conf_dir 'nginx.conf.in')
         $line_index = 0
         foreach($line_text in $lines) {
@@ -576,7 +635,7 @@ $actions.init.nginx = {
             } elseif($line_text.Contains('@XWEB_SERVER_NAMES@')) {
                 $lines[$line_index] = $line_text.Replace('@XWEB_SERVER_NAMES@', $local_props['server_names'])
             }
-            elseif ($line_text.Contains('nobody')) {
+            elseif (!$IsWin -and $line_text.Contains('nobody')) {
                 $line_text = $line_text.Replace('nobody', "$(whoami)")
                 if ($line_text.StartsWith('#')) { $line_text = $line_text.TrimStart('#') }
                 $lines[$line_index] = $line_text
@@ -584,6 +643,9 @@ $actions.init.nginx = {
             ++$line_index
         }
         Set-Content -Path (Join-Path $nginx_conf_dir 'nginx.conf') -Value $lines
+    } else {
+        mkdirs $nginx_conf_dir
+        Copy-Item (Join-Path $install_prefix "nginx/$nginx_ver/conf/*") $nginx_conf_dir
     }
 
     if ($IsUbuntu) {
@@ -592,7 +654,7 @@ $actions.init.nginx = {
         #     sudo groupadd nginx
         #     sudo useradd -g nginx -s /sbin/nologin nginx
         # }
-        sudo chown -R vmroot:vmroot $xweb_root/htdocs
+        sudo chown -R ${xweb_user}:${xweb_user} $xweb_root/htdocs
     }
 }
 
@@ -634,6 +696,9 @@ switch($op){
     'stop' {
         println "Stopping server ..."
         run_action 'stop' $targets
+    }
+    'passwd' {
+        run_action 'passwd' $targets
     }
 }
 
