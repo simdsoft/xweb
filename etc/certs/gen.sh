@@ -30,13 +30,13 @@ hash_alg=-sha384
 issued_org='Simdsoft Limited'
 
 # issuer information
-issuer_valid_years=100
+issuer_valid_years=1003
 issuer_org='Simdsoft Limited'
 issuer_name="Simdsoft RSA CA $issuer_valid_years"
 issuer_subj="/C=CN/O=$issuer_org/CN=$issuer_name"
 
 
-valid_years=$issuer_valid_years
+valid_years=3
 
 if [ "$force" = 'true' ] ; then
   echo 'force regen certs ...'
