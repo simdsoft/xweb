@@ -1,48 +1,52 @@
-## xweb - A nginx + mysql + php environment
+## qweb - A quick web environment(nginx + mysql + php) supporting both windows and ubuntu
 
-[![Latest Release](https://img.shields.io/github/v/release/simdsoft/xweb?label=release)](https://github.com/simdsoft/xweb/releases)
+[![Latest Release](https://img.shields.io/github/v/release/simdsoft/qweb?label=release)](https://github.com/simdsoft/qweb/releases)
 
 ## Quick Start
 
 ### install and start service
 1. Install [powershell 7](https://github.com/PowerShell/PowerShell) and open pwsh terminal
-2. Clone https://github.com/simdsoft/xweb.git and goto to root directory of xweb
-3. `./xweb install`
+2. Clone https://github.com/simdsoft/qweb.git and goto to root directory of qweb
+3. `./qweb install`
 4. `./etc/certs/gen.sh`, on windows, please enter wsl to execute script `gen.sh`
-5. `./xweb start`
+5. `./qweb start`
 
 ### visit local web
 
-1. Add domain `sandbox.xweb.dev` to your system hosts
+1. Add domain `sandbox.qweb.dev` to your system hosts
 2. Install `./etc/certs/ca-cer.crt` to `Trusted Root Certificate Authorities` of current user
 3. visit web on your browser
-  - https://sandbox.xweb.dev/phpinfo.php to check does php works
-  - https://sandbox.xweb.dev/phpmyadmin to manage database
-
+   - http:
+      - http://localhost/phpinfo.php to check does php works
+      - http://localhost/phpmyadmin to manage database
+   - https
+      - https://sandbox.qweb.dev/phpinfo.php to check does php works
+      - https://sandbox.qweb.dev/phpmyadmin to manage database
+   visit by curl.exe: `curl -v --ssl-no-revoke https://sandbox.qweb.dev/phpinfo.php`
 Note:  
 
-if xweb was moved to other location or you modify domain name in `local.properties`, 
-then please re-run `xweb.ps1 init nginx -f` and restart nginx by `xweb.ps1 restart nginx`
+if qweb was moved to other location or you modify domain name in `local.properties`, 
+then please re-run `qweb init nginx -f` and restart nginx by `qweb restart nginx`
 
-## xweb-cmdline usage
+## qweb-cmdline usage
 
-`xweb.ps1 action_name targets`
+`qweb action_name targets`
 
 - *`action_name`*: `install`, `start`, `stop`, `restart`
 - *`targets`*(optional): possible values: `all`, `nginx`, `php`, `phpmyadmin`, `mysql`
 
 examples:  
 
-- `xweb.ps1 install`: install WNMP on windows or LNMP on ubuntu linux
-- `xweb.ps1 start`: start nginx, mysqld, php-cgi
-- `xweb.ps1 stop`: stop nginx, mysqld, php-cgi
-- `xweb.ps1 restart`: restart nginx, mysqld, php-cgi
-- `xweb.ps1 passwd mysql`: reset mysqld password
+- `qweb install`: install WNMP on windows or LNMP on ubuntu linux
+- `qweb start`: start nginx, mysqld, php-cgi
+- `qweb stop`: stop nginx, mysqld, php-cgi
+- `qweb restart`: restart nginx, mysqld, php-cgi
+- `qweb passwd mysql`: reset mysqld password
 
 ## Support platforms
 
-- Windows: ready
-- Ubuntu Linux: testing
+- ✅ Windows
+- ✅ Ubuntu
 
 Note:  
 

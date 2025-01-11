@@ -33,87 +33,17 @@ http {
 
     #gzip  on;
 
-    # server {
-    #     listen       80;
-    #     server_name  localhost;
-
-    #     #charset koi8-r;
-
-    #     #access_log  logs/host.access.log  main;
-
-    #     location / {
-    #         root   html;
-    #         index  index.html index.htm;
-    #     }
-
-    #     #error_page  404              /404.html;
-
-    #     # redirect server error pages to the static page /50x.html
-    #     #
-    #     error_page   500 502 503 504  /50x.html;
-    #     location = /50x.html {
-    #         root   html;
-    #     }
-
-    #     # proxy the PHP scripts to Apache listening on 127.0.0.1:80
-    #     #
-    #     #location ~ \.php$ {
-    #     #    proxy_pass   http://127.0.0.1;
-    #     #}
-
-    #     # pass the PHP scripts to FastCGI server listening on 127.0.0.1:9000
-    #     #
-    #     #location ~ \.php$ {
-    #     #    root           html;
-    #     #    fastcgi_pass   127.0.0.1:9000;
-    #     #    fastcgi_index  index.php;
-    #     #    fastcgi_param  SCRIPT_FILENAME  /scripts$fastcgi_script_name;
-    #     #    include        fastcgi_params;
-    #     #}
-
-    #     # deny access to .htaccess files, if Apache's document root
-    #     # concurs with nginx's one
-    #     #
-    #     #location ~ /\.ht {
-    #     #    deny  all;
-    #     #}
-    # }
-
-
-    # another virtual host using mix of IP-, name-, and port-based configuration
-    #
-    #server {
-    #    listen       8000;
-    #    listen       somename:8080;
-    #    server_name  somename  alias  another.alias;
-
-    #    location / {
-    #        root   html;
-    #        index  index.html index.htm;
-    #    }
-    #}
-
-
-    # HTTPS server
+    # HTTP server
     #
     server {
-       listen       443 ssl;
-       server_name  @XWEB_SERVER_NAMES@;
+       listen       80;
+       server_name  @QWEB_SERVER_NAMES@;
        # relative path not work, will cause php 'No input file specified'
        # use $realpath_root also not work
-       set $xweb_root @XWEB_ROOT@;
-
-       ssl_certificate      ../../certs/server.crt;
-       ssl_certificate_key  ../../certs/server.key;
-
-       ssl_session_cache    shared:SSL:1m;
-       ssl_session_timeout  5m;
-
-       ssl_ciphers  HIGH:!aNULL:!MD5;
-       ssl_prefer_server_ciphers  on;
+       set $qweb_root @QWEB_ROOT@;
 
        location / {
-           root $xweb_root/htdocs;
+           root $qweb_root/htdocs;
            
            add_header 'Cross-Origin-Embedder-Policy' 'require-corp'; 
            add_header 'Cross-Origin-Opener-Policy' 'same-origin';
@@ -131,7 +61,58 @@ http {
 
        location /phpmyadmin {
          rewrite ^/phpmyadmin$ /phpmyadmin/ permanent;
-         alias $xweb_root/opt/phpmyadmin/5.2.1/;
+         alias $qweb_root/opt/phpmyadmin/5.2.1/;
+         location ~ ^/phpmyadmin/(.+\.php)$ {
+           try_files $uri =404;
+           fastcgi_pass   127.0.0.1:9000;
+           fastcgi_index  index.php;
+           include fastcgi_params;
+           # $document_root$fastcgi_script_name not work
+           # $request_filename also works, not not perform rewrite /phpmyadmin/
+           fastcgi_param  SCRIPT_FILENAME $document_root$1;
+         }
+         index  index.php index.html index.htm;
+       }
+    }
+
+    # HTTPS server
+    #
+    server {
+       listen       443 ssl;
+       server_name  @QWEB_SERVER_NAMES@;
+       # relative path not work, will cause php 'No input file specified'
+       # use $realpath_root also not work
+       set $qweb_root @QWEB_ROOT@;
+
+       ssl_certificate     @QWEB_CERT_DIR@/server.crt;
+       ssl_certificate_key  @QWEB_CERT_DIR@/server.key;
+
+       ssl_session_cache    shared:SSL:1m;
+       ssl_session_timeout  5m;
+
+       ssl_ciphers  HIGH:!aNULL:!MD5;
+       ssl_prefer_server_ciphers  on;
+
+       location / {
+           root $qweb_root/htdocs;
+           
+           add_header 'Cross-Origin-Embedder-Policy' 'require-corp'; 
+           add_header 'Cross-Origin-Opener-Policy' 'same-origin';
+	   
+           location ~ \.php$ {
+              try_files $uri $uri/ =404;
+              fastcgi_pass   127.0.0.1:9000;
+              fastcgi_index  index.php;
+              include fastcgi_params;
+              fastcgi_param  SCRIPT_FILENAME  $document_root$fastcgi_script_name;
+           }
+
+           index  index.php index.html index.htm;
+       }
+
+       location /phpmyadmin {
+         rewrite ^/phpmyadmin$ /phpmyadmin/ permanent;
+         alias $qweb_root/opt/phpmyadmin/5.2.1/;
          location ~ ^/phpmyadmin/(.+\.php)$ {
            try_files $uri =404;
            fastcgi_pass   127.0.0.1:9000;

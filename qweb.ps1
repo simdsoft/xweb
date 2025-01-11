@@ -1,7 +1,7 @@
 #
 # Copyright (c) 2024-present Simdsoft Limited.
 #
-# xweb - A nginx + mysql + php environment
+# qweb - A quick web environment(nginx + mysql + php) supporting both windows and ubuntu
 #
 param(
     $op = 'start',
@@ -10,13 +10,13 @@ param(
     [switch]$version
 )
 
-$xweb_ver = '1.1.0'
+$qweb_ver = '1.2.0'
 
 Set-Alias println Write-Host
 
-println "xweb version $xweb_ver"
+println "qweb version $qweb_ver"
 
-if($version) { return }
+if ($version) { return }
 
 $Global:IsWin = $IsWindows -or ("$env:OS" -eq 'Windows_NT')
 $Global:IsUbuntu = !$IsWin -and ($PSVersionTable.OS -like 'Ubuntu *')
@@ -40,14 +40,14 @@ function parse_prop($line_text) {
 
 function ConvertFrom-Props {
     param(
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory = $true)]
         $InputObject
     )
 
     $props = @{}
 
-    foreach($_ in $InputObject) {
-        $key,$val = parse_prop $_
+    foreach ($_ in $InputObject) {
+        $key, $val = parse_prop $_
         if ($key) {
             $props[$key] = $val
         }
@@ -58,7 +58,7 @@ function ConvertFrom-Props {
 
 function gen_random_key {
     param(
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory = $true)]
         [int]$Length
     )
 
@@ -91,8 +91,8 @@ function download_and_expand($url, $out, $dest) {
     download_file $url $out
     try {
         mkdirs($dest)
-        if($out.EndsWith('.zip')) {
-            if($IsWin) {
+        if ($out.EndsWith('.zip')) {
+            if ($IsWin) {
                 Expand-Archive -Path $out -DestinationPath $dest -Force
             }
             else {
@@ -119,8 +119,9 @@ function download_and_expand($url, $out, $dest) {
 function resolve_path ($path, $prefix = $null) { 
     if ([IO.Path]::IsPathRooted($path)) { 
         return $path 
-    } else {
-        if(!$prefix) { $prefix = $PSScriptRoot }
+    }
+    else {
+        if (!$prefix) { $prefix = $PSScriptRoot }
         return Join-Path $prefix $path
     }
 }
@@ -131,12 +132,14 @@ function fetch_pkg($url, $out = $null, $exrep = $null, $prefix = $null) {
 
     $pfn_rename = $null
 
-    if($exrep) {
+    if ($exrep) {
         $exrep = $exrep.Split('=')
-        if ($exrep.Count -eq 1) { # single file
+        if ($exrep.Count -eq 1) {
+            # single file
             if (!$prefix) {
                 $prefix = resolve_path $exrep[0]
-            } else {
+            }
+            else {
                 $prefix = resolve_path $prefix
             }
         }
@@ -155,10 +158,12 @@ function fetch_pkg($url, $out = $null, $exrep = $null, $prefix = $null) {
             }
             if (Test-Path $inst_dst -PathType Container) { Remove-Item $inst_dst -Recurse -Force }
         }
-    } else {
+    }
+    else {
         if (!$prefix) {
             $prefix = $install_prefix
-        } else {
+        }
+        else {
             $prefix = resolve_path $prefix
         }
     }
@@ -171,7 +176,7 @@ function fetch_pkg($url, $out = $null, $exrep = $null, $prefix = $null) {
 $Script:local_props = $null
 $actions = @{
     setup_env = {
-        if(!$targets) {
+        if (!$targets) {
             throw "targets is empty!"
         }
 
@@ -179,7 +184,8 @@ $actions = @{
             $targets = @('nginx', 'php', 'mysql')
             $setup_actions = @('init'; 'fetch'; 'install')
             if ($setup_actions.Contains($op)) { $targets += 'phpmyadmin' }
-        } elseif($targets -isnot [array]) {
+        }
+        elseif ($targets -isnot [array]) {
             $targets = "$targets".Split(',')
         }
 
@@ -197,12 +203,12 @@ $actions = @{
         }
         else {
             $mysql_pass = gen_random_key -Length 16
-            $props_lines = @("mysql_pass=$mysql_pass", "mysql_auth_backport=0", "server_names=sandbox.xweb.dev")
+            $props_lines = @("mysql_pass=$mysql_pass", "mysql_auth_backport=0", "server_names=sandbox.qweb.dev")
             Set-Content -Path $prop_file -Value $props_lines
         }
         $Script:local_props = ConvertFrom-Props $props_lines
 
-        if($IsWin) {
+        if ($IsWin) {
             $is_php8 = $php_ver -ge [Version]'8.0.0'
             $Script:php_vs = @('vc15', 'vs17')[$is_php8]
 
@@ -215,29 +221,29 @@ $actions = @{
 function mod_php_ini($php_ini_file, $do_setup) {
     $match_ext = {
         param($ext, $exts)
-        foreach($item in $exts) {
-            if($ext -like $item) {
+        foreach ($item in $exts) {
+            if ($ext -like $item) {
                 return $true
             }
         }
         return $false
     }
 
-    $upload_props = @{upload_max_filesize='64M'; post_max_size='64M'; memory_limit='128M'}
+    $upload_props = @{upload_max_filesize = '64M'; post_max_size = '64M'; memory_limit = '128M' }
 
     $exclude_exts = @('*=oci8_12c*', '*=pdo_firebird*', '*=pdo_oci*', '*=snmp*')
 
     $lines = Get-Content -Path $php_ini_file
     $line_index = 0
     $mods = 0
-    foreach($line_text in $lines) {
-        if($line_text -like ';extension_dir = "ext"') {
+    foreach ($line_text in $lines) {
+        if ($line_text -like ';extension_dir = "ext"') {
             if ($do_setup) {
                 $lines[$line_index] = 'extension_dir = "ext"'
                 ++$mods
             }
         } 
-        elseif($line_text -like '*extension=*') {
+        elseif ($line_text -like '*extension=*') {
             if ($do_setup) {
                 if ($line_text -like ';extension=*') {
                     if (-not (&$match_ext $line_text $exclude_exts)) {
@@ -248,13 +254,13 @@ function mod_php_ini($php_ini_file, $do_setup) {
                 }
 
                 $match_info = [Regex]::Match($line_text, '(?<!;)\bextension=([^;]+)')
-                if($match_info.Success -and $line_text.StartsWith('extension=')) {
+                if ($match_info.Success -and $line_text.StartsWith('extension=')) {
                     println "php.ini: $($match_info.value)"
                 }
             }
         }
         else {
-            $key,$val = parse_prop $line_text
+            $key, $val = parse_prop $line_text
             if ($key -and $upload_props.Contains($key)) {
                 $new_val = $upload_props[$key]
                 $lines[$line_index] = "$key = $new_val"
@@ -269,13 +275,14 @@ function mod_php_ini($php_ini_file, $do_setup) {
 
 if ($IsWin) {
     $actions.fetch = @{
-        nginx = {
+        nginx      = {
             fetch_pkg "https://nginx.org/download/nginx-${nginx_ver}.zip" -exrep "nginx-${nginx_ver}=${nginx_ver}" -prefix 'opt/nginx'
         }
-        php = {
+        php        = {
             if ($php_ver -eq $php_latset) {
                 fetch_pkg "https://windows.php.net/downloads/releases/php-${php_ver}-Win32-$php_vs-x64.zip" -exrep "opt/php/${php_ver}"
-            } else {
+            }
+            else {
                 fetch_pkg "https://windows.php.net/downloads/releases/archives/php-${php_ver}-Win32-$php_vs-x64.zip" -exrep "opt/php/${php_ver}"
             }
         }
@@ -283,7 +290,7 @@ if ($IsWin) {
             fetch_pkg "https://files.phpmyadmin.net/phpMyAdmin/${phpmyadmin_ver}/phpMyAdmin-${phpmyadmin_ver}-all-languages.zip" -exrep "phpMyAdmin-${phpmyadmin_ver}-all-languages=${phpmyadmin_ver}" -prefix 'opt/phpmyadmin'
             fetch_pkg "https://files.phpmyadmin.net/themes/boodark-nord/1.1.0/boodark-nord-1.1.0.zip" -prefix "opt/phpmyadmin/${phpmyadmin_ver}/themes/"
         }
-        mysql = {
+        mysql      = {
             if ($mysql_ver -eq $mysql_latest) {
                 fetch_pkg "https://cdn.mysql.com//Downloads/MySQL-$($mysql_ver.Major).$($mysql_ver.Minor)/mysql-$mysql_ver-winx64.zip" -exrep "mysql-${mysql_ver}-winx64=${mysql_ver}" -prefix 'opt/mysql'
             }
@@ -291,12 +298,12 @@ if ($IsWin) {
                 fetch_pkg "https://downloads.mysql.com/archives/get/p/23/file/mysql-${mysql_ver}-winx64.zip" -exrep "mysql-${mysql_ver}-winx64=${mysql_ver}" -prefix 'opt/mysql'
             }
         }
-        mariadb = {
+        mariadb    = {
             fetch_pkg "https://mirrors.tuna.tsinghua.edu.cn/mariadb///mariadb-$mariadb_ver/winx64-packages/mariadb-$mariadb_ver-winx64.zip" -exrep "mariadb-$mariadb_ver-winx64=$mariadb_ver" -prefix 'opt/mariadb'
         }
     }
     $actions.init = @{
-        php = {
+        php        = {
             $php_dir = Join-Path $install_prefix "php/$php_ver"
             $php_ini = (Join-Path $php_dir 'php.ini')
         
@@ -306,7 +313,7 @@ if ($IsWin) {
                 # xdebug ini
                 $lines += '`n'
                 $xdebug_lines = Get-Content -Path (Join-Path $PSScriptRoot 'etc/php/xdebug.ini')
-                foreach($line_text in $xdebug_lines) {
+                foreach ($line_text in $xdebug_lines) {
                     $lines += $line_text
                 }
         
@@ -332,35 +339,35 @@ if ($IsWin) {
                 $line_index = 0
                 $has_theme_manager = $false
                 $has_theme_default = $false
-                foreach($line_text in $lines) {
+                foreach ($line_text in $lines) {
                     if ($line_text -like "*blowfish_secret*") {
                         $lines[$line_index] = $line_text.Replace("''", "'$blowfish_secret'")
                     }
-                    elseif($line_text -like '*ThemeManager*') {
+                    elseif ($line_text -like '*ThemeManager*') {
                         $lines[$line_index] = $line_text.Replace("false", "true")
                         $has_theme_manager = $true
                     }
-                    elseif($line_text -like '*ThemeDefault*') {
+                    elseif ($line_text -like '*ThemeDefault*') {
                         $lines[$line_index] = $line_text -replace "'.*'", "'boodark-nord'"
                         $has_theme_default = $true
                     }
                     ++$line_index
                 }
-                if(!$has_theme_manager) {
+                if (!$has_theme_manager) {
                     $lines += "`$cfg['ThemeManager'] = true;"
                     $lines += "`$cfg['ShowAll'] = true;"
                 }
-                if(!$has_theme_default) {
+                if (!$has_theme_default) {
                     $lines += "`$cfg['ThemeDefault'] = 'boodark-nord';"
                 }
                 Set-Content -Path $phpmyadmin_conf -Value $lines
             }
         }
-        mysql = {
+        mysql      = {
             # enable plugin mysql_native_password, may don't required
             $mysql_dir = Join-Path $install_prefix "mysql/$mysql_ver"
             if (Test-Path $mysqld_data -PathType Container) {
-                $anwser = if ($force) {  Read-Host "Are you sure force reinit mysqld, will lost all database(y/N)?" } else { 'N' }
+                $anwser = if ($force) { Read-Host "Are you sure force reinit mysqld, will lost all database(y/N)?" } else { 'N' }
                 if ($anwser -inotlike 'y*') {
                     println "mysql init: nothing need to do"
                     return
@@ -391,7 +398,8 @@ if ($IsWin) {
 
             if ($mysql_auth_backport) {
                 $set_pass_cmds = "use mysql; ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '$mysql_pass'; FLUSH PRIVILEGES;"
-            } else {
+            }
+            else {
                 $set_pass_cmds = "use mysql; UPDATE user SET authentication_string='' WHERE user='root'; ALTER user 'root'@'localhost' IDENTIFIED BY '$mysql_pass';"
             }
             & $mysql_prog -u root -e $set_pass_cmds | Out-Host
@@ -439,7 +447,7 @@ if ($IsWin) {
             Pop-Location
             Start-Process $nginx_prog -ArgumentList "-c `"$nginx_conf`"" -WorkingDirectory $nginx_cwd -WindowStyle Hidden
         }
-        php = {
+        php   = {
             $php_dir = Join-Path $install_prefix "php/$php_ver"
             $php_cgi_prog = Join-Path $php_dir 'php-cgi.exe'
             $php_cgi_cwd = Join-Path $PSScriptRoot 'var/php-cgi'
@@ -456,7 +464,7 @@ if ($IsWin) {
             taskkill /f /im nginx.exe 2>$null
             $Global:LASTEXITCODE = 0
         }
-        php = {
+        php   = {
             taskkill /f /im php-cgi.exe 2>$null
             taskkill /f /im intelliphp.ls.exe 2>$null
             $Global:LASTEXITCODE = 0
@@ -466,10 +474,12 @@ if ($IsWin) {
             $Global:LASTEXITCODE = 0
         }
     }
-} elseif($IsUbuntu) { # Ubuntu Linux
+}
+elseif ($IsUbuntu) {
+    # Ubuntu Linux
     # local dev, use current user to run mysql
     # please use `mysql` as mysqld runner user when publish your site
-    $Script:xweb_user = whoami
+    $Script:qweb_user = whoami
     $actions.fetch = @{
         nginx = {
             $nginx_dir = "$install_prefix/nginx/$nginx_ver"
@@ -483,7 +493,7 @@ if ($IsWin) {
                 Pop-Location
             }
         }
-        php = {
+        php   = {
             # ensure we can install old releases of php on ubuntu
             $php_ppa = $(grep -ri '^deb.*ondrej/php' /etc/apt/sources.list /etc/apt/sources.list.d/)
             if (!$php_ppa) {
@@ -528,19 +538,20 @@ if ($IsWin) {
         }
     }
     $actions.init = @{
-        php = {
+        php   = {
             $php_ini_dir = "/etc/php/$($php_ver.Major).$($php_ver.Minor)/cgi"
             $lines, $mods = mod_php_ini "$php_ini_dir/php.ini" $false
             if ($mods) {
                 Set-Content -Path "$download_path/php.ini" -Value $lines
                 sudo cp -f "$download_path/php.ini" "$php_ini_dir/php.ini"
-            } else {
+            }
+            else {
                 println "php init: nothing need to do"
             }
         }
         mysql = {
             if (Test-Path /var/lib/mysql* -PathType Container) {
-                $anwser = if($force) { Read-Host "Are you sure force reinit mysqld, will lost all database(y/N)?" } else { 'N' }
+                $anwser = if ($force) { Read-Host "Are you sure force reinit mysqld, will lost all database(y/N)?" } else { 'N' }
                 if ($anwser -inotlike 'y*') {
                     println "mysql init: nothing need to do"
                     return
@@ -548,30 +559,31 @@ if ($IsWin) {
             }
 
             $mysql_tmp_dirs = @('/var/run/mysql', '/var/run/mysqld', '/var/lib/mysql', '/var/lib/mysql-files', '/var/log/mysql')
-            foreach($tmp_dir in $mysql_tmp_dirs) {
+            foreach ($tmp_dir in $mysql_tmp_dirs) {
                 sudo rm -rf $tmp_dir
                 sudo mkdir -p $tmp_dir
-                sudo chown -R ${xweb_user}:$xweb_user $tmp_dir
+                sudo chown -R ${qweb_user}:$qweb_user $tmp_dir
             }
 
-            sudo chown -R ${xweb_user}:$xweb_user /etc/mysql
+            sudo chown -R ${qweb_user}:$qweb_user /etc/mysql
             sudo chmod -R 750 /var/run/mysql /var/lib/mysql* /var/log/mysql /etc/mysql
             ls -l /var/run | grep mysql
             ls -l /var/lib | grep mysql
             ls -l /var/log | grep mysql
 
-            sudo mysqld --initialize-insecure --user=$xweb_user | Out-Host
+            sudo mysqld --initialize-insecure --user=$qweb_user | Out-Host
             
             $mysql_auth_backport = [int]$local_props['mysql_auth_backport']
             $mysql_pass = $local_props['mysql_pass']
             if ($mysql_auth_backport) {
                 Copy-Item (Join-Path $PSScriptRoot "etc/mysql/my.ini") '/etc/mysql/conf.d/mysql.cnf' -Force
                 $init_cmds = "use mysql; ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '$mysql_pass'; FLUSH PRIVILEGES;"
-            } else {
+            }
+            else {
                 $init_cmds = "use mysql; UPDATE user SET authentication_string='' WHERE user='root'; ALTER user 'root'@'localhost' IDENTIFIED BY '$mysql_pass';"
             }
 
-            bash -c "sudo mysqld --user=$xweb_user >/dev/null 2>&1 &"
+            bash -c "sudo mysqld --user=$qweb_user >/dev/null 2>&1 &"
             println "Wait mysqld ready ..."
             Start-Sleep -Seconds 3
             mysql -u root -e $init_cmds | Out-Host
@@ -587,39 +599,41 @@ if ($IsWin) {
             bash -c "sudo ./sbin/nginx -c '$nginx_conf' >/dev/null 2>&1 &"
             Pop-Location
         }
-        php = {
+        php   = {
             bash -c "nohup sudo php-cgi -b 127.0.0.1:9000 >/dev/null 2>&1 &"
         }
         mysql = {
-            bash -c "nohup sudo mysqld --user=$xweb_user >/dev/null 2>&1 &"
+            bash -c "nohup sudo mysqld --user=$qweb_user >/dev/null 2>&1 &"
         }
     }
     $actions.stop = @{
         nginx = {
             sudo pkill -f nginx
         }
-        php = {
+        php   = {
             sudo pkill -f php-cgi
         }
         mysql = {
             sudo pkill -f mysqld
         }
     }
-} else {
+}
+else {
     throw "Unsupported OS: $($PSVersionTable.OS)"
 }
 
 $actions.init.nginx = {
-    if($IsWin) {
-        $xweb_root = $PSScriptRoot.Replace('\', '/')
-    } else {
-        $xweb_root = $PSScriptRoot
+    if ($IsWin) {
+        $qweb_root = $PSScriptRoot.Replace('\', '/')
+    }
+    else {
+        $qweb_root = $PSScriptRoot
     }
 
     $nginx_conf_dir = Join-Path $PSScriptRoot "etc/nginx/$nginx_ver"
     $nginx_conf_file = Join-Path $nginx_conf_dir 'nginx.conf'
     if (Test-Path $nginx_conf_file -PathType Leaf) {
-        $anwser = if($force) { Read-Host "Are you want force reinit nginx, will lost conf?(y/N)" } else { 'N' }
+        $anwser = if ($force) { Read-Host "Are you want force reinit nginx, will lost conf?(y/N)" } else { 'N' }
         if ($anwser -inotlike 'y*') {
             println "nginx init: nothing need to do"
             return
@@ -629,11 +643,26 @@ $actions.init.nginx = {
     if ((Test-Path $nginx_conf_dir -PathType Container)) {
         $lines = Get-Content -Path (Join-Path $nginx_conf_dir 'nginx.conf.in')
         $line_index = 0
-        foreach($line_text in $lines) {
-            if ($line_text.Contains('@XWEB_ROOT@')) {
-                $lines[$line_index] = $line_text.Replace('@XWEB_ROOT@', $xweb_root)
-            } elseif($line_text.Contains('@XWEB_SERVER_NAMES@')) {
-                $lines[$line_index] = $line_text.Replace('@XWEB_SERVER_NAMES@', $local_props['server_names'])
+        $qweb_cert_dir = Join-Path $PSScriptRoot 'etc/certs'
+        if (!(Test-Path (Join-Path $qweb_cert_dir 'server.crt') -PathType Leaf) -or
+            !(Test-Path (Join-Path $qweb_cert_dir 'server.key') -PathType Leaf)
+        ) {
+            $qweb_cert_dir = (Join-Path $qweb_cert_dir 'sample').Replace('\', '/')
+            $qweb_rel_cert_dir = '../../certs/sample'
+            Write-Warning "Using sample certs in dir $qweb_cert_dir"
+        } else {
+            $qweb_rel_cert_dir = '../../certs'
+        }
+        $qweb_cert_dir = $qweb_cert_dir.Replace('\', '/')
+        foreach ($line_text in $lines) {
+            if ($line_text.Contains('@QWEB_ROOT@')) {
+                $lines[$line_index] = $line_text.Replace('@QWEB_ROOT@', $qweb_root)
+            }
+            elseif ($line_text.Contains('@QWEB_SERVER_NAMES@')) {
+                $lines[$line_index] = $line_text.Replace('@QWEB_SERVER_NAMES@', $local_props['server_names'])
+            }
+            elseif($line_text.Contains('@QWEB_CERT_DIR@')) {
+                $lines[$line_index] = $line_text.Replace('@QWEB_CERT_DIR@', $qweb_rel_cert_dir)
             }
             elseif (!$IsWin -and $line_text.Contains('nobody')) {
                 $line_text = $line_text.Replace('nobody', "$(whoami)")
@@ -643,7 +672,8 @@ $actions.init.nginx = {
             ++$line_index
         }
         Set-Content -Path (Join-Path $nginx_conf_dir 'nginx.conf') -Value $lines
-    } else {
+    }
+    else {
         mkdirs $nginx_conf_dir
         Copy-Item (Join-Path $install_prefix "nginx/$nginx_ver/conf/*") $nginx_conf_dir
     }
@@ -654,17 +684,18 @@ $actions.init.nginx = {
         #     sudo groupadd nginx
         #     sudo useradd -g nginx -s /sbin/nologin nginx
         # }
-        sudo chown -R ${xweb_user}:${xweb_user} $xweb_root/htdocs
+        sudo chown -R ${qweb_user}:${qweb_user} $qweb_root/htdocs
     }
 }
 
 function run_action($name, $targets) {
     $action = $actions[$name]
-    foreach($target in $targets) {
+    foreach ($target in $targets) {
         $action_comp = $action.$target
         if ($action_comp) {
             & $action_comp
-        } else {
+        }
+        else {
             println "The $target not support action: $name"
         }
     }
@@ -672,7 +703,7 @@ function run_action($name, $targets) {
 
 & $actions.setup_env
 
-switch($op){
+switch ($op) {
     'fetch' {
         run_action 'fetch' $targets
     }
@@ -702,7 +733,7 @@ switch($op){
     }
 }
 
-if($?) {
+if ($?) {
     println "The operation successfully."
 }
 else {

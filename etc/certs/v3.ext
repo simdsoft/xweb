@@ -3,5 +3,5 @@ basicConstraints=CA:FALSE
 keyUsage = digitalSignature, nonRepudiation, keyEncipherment, dataEncipherment
 subjectAltName = @alt_names
 [alt_names]
-DNS.1 = xweb.dev
-DNS.2 = *.xweb.dev
+DNS.1 = qweb.dev
+DNS.2 = *.qweb.dev

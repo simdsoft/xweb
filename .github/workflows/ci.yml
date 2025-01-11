@@ -14,7 +14,7 @@ jobs:
     - name: CI
       shell: pwsh
       run: |
-        .\xweb.ps1 install
+        .\qweb install
   ubuntu:
     runs-on: ubuntu-latest
     steps:
@@ -22,4 +22,4 @@ jobs:
     - name: CI
       shell: pwsh
       run: |
-        ./xweb.ps1 install
+        ./qweb install

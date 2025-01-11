@@ -24,18 +24,21 @@ function years_to_days {
 is_v1=$1
 force=$2
 key_bits=2048
-# firefox requre domain name
-domain_name="xweb.dev"
+
 hash_alg=-sha384
-issued_org='Simdsoft Limited'
 
 # issuer information
-issuer_valid_years=1002
-issuer_org='Simdsoft Limited'
-issuer_name="Simdsoft RSA CA $issuer_valid_years"
+issuer_valid_years=1000
+issuer_org='qweb'
+issuer_name="QWEB RSA CA $issuer_valid_years" # issuer common name
 issuer_subj="/C=CN/O=$issuer_org/CN=$issuer_name"
 
-valid_years=3
+issued_org=$issuer_org
+# issued common name firefox requre domain name
+issued_name=qweb.dev
+
+# modify to 1 or 3 years when publish your site
+valid_years=1000
 
 if [ "$force" = 'true' ] ; then
   echo 'force regen certs ...'
@@ -59,18 +62,16 @@ fi
 
 # 1. Generate unencrypted 2048-bits RSA private key for the server (CA) & Generate CSR for the server
 valid_days=`years_to_days $valid_years`
-openssl req -newkey rsa:$key_bits $hash_alg -nodes -keyout server.key -out server-csr.pem -subj "/C=CN/O=$issued_org/CN=$domain_name"
+openssl req -newkey rsa:$key_bits $hash_alg -nodes -keyout server.key -out server.csr -subj "/C=CN/O=$issued_org/CN=$issued_name"
 
 # 2. Sign with our RootCA
 if [ "$is_v1" != 'true' ] ; then
   # subjectAltName in extfile is important for browser visit
   v3ext_file=`pwd`/v3.ext
-  openssl x509 -req $hash_alg -in server-csr.pem -CA ca-cer.pem -CAkey ca-prk.pem -CAcreateserial -out server.crt -days $valid_days -extfile $v3ext_file
+  openssl x509 -req $hash_alg -in server.csr -CA ca-cer.pem -CAkey ca-prk.pem -CAcreateserial -out server.crt -days $valid_days -extfile $v3ext_file
 else
-  openssl x509 -req $hash_alg -in server-csr.pem -CA ca-cer.pem -CAkey ca-prk.pem -CAcreateserial -out server.crt -days $valid_days
+  openssl x509 -req $hash_alg -in server.csr -CA ca-cer.pem -CAkey ca-prk.pem -CAcreateserial -out server.crt -days $valid_days
 fi
-
-rm -rf ./server-csr.pem
 
 # Check if the certificate is signed properly
 openssl x509 -in server.crt -noout -text
