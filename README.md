@@ -1,6 +1,12 @@
-## qweb - A quick web environment(nginx + mysql + php) supporting both windows and ubuntu
+## qweb - A quick web environment(nginx + mysql + php) supporting both windows, ubuntu and macos
 
 [![Latest Release](https://img.shields.io/github/v/release/simdsoft/qweb?label=release)](https://github.com/simdsoft/qweb/releases)
+
+## Support platforms
+
+- ✅ Windows
+- ✅ Ubuntu
+- ✅ macOS (You need install brew first)
 
 ## Quick Start
 
@@ -42,12 +48,6 @@ examples:
 - `qweb stop`: stop nginx, mysqld, php-cgi
 - `qweb restart`: restart nginx, mysqld, php-cgi
 - `qweb passwd mysql`: reset mysqld password
-
-## Support platforms
-
-- ✅ Windows
-- ✅ Ubuntu
-- ✅ macOS (You need install brew first)
 
 Note:  
 
