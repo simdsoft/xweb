@@ -23,3 +23,11 @@ jobs:
       shell: pwsh
       run: |
         ./qweb install
+  macos:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: CI
+      shell: pwsh
+      run: |
+        ./qweb install

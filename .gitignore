@@ -11,3 +11,5 @@ etc/certs/ca-*
 etc/certs/server*
 
 htdocs
+
+.ds_Store

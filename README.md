@@ -47,6 +47,7 @@ examples:
 
 - ✅ Windows
 - ✅ Ubuntu
+- ✅ macOS (You need install brew first)
 
 Note:  
 

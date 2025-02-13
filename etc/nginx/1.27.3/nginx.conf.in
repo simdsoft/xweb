@@ -61,7 +61,7 @@ http {
 
        location /phpmyadmin {
          rewrite ^/phpmyadmin$ /phpmyadmin/ permanent;
-         alias $qweb_root/opt/phpmyadmin/5.2.1/;
+         alias $qweb_root/opt/phpmyadmin/@phpmyadmin_ver@/;
          location ~ ^/phpmyadmin/(.+\.php)$ {
            try_files $uri =404;
            fastcgi_pass   127.0.0.1:9000;
@@ -112,7 +112,7 @@ http {
 
        location /phpmyadmin {
          rewrite ^/phpmyadmin$ /phpmyadmin/ permanent;
-         alias $qweb_root/opt/phpmyadmin/5.2.1/;
+         alias $qweb_root/opt/phpmyadmin/@phpmyadmin_ver@/;
          location ~ ^/phpmyadmin/(.+\.php)$ {
            try_files $uri =404;
            fastcgi_pass   127.0.0.1:9000;
